@@ -1,6 +1,7 @@
 import logging
 import requests
 import json
+from pprint import pprint
 from bs4 import BeautifulSoup
 
 header = {'User-agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36'}
@@ -10,8 +11,40 @@ logging.basicConfig(filename="./giant.log", level=logging.DEBUG, format=LOG_FORM
 logger = logging.getLogger()
 
 
-def get_bike_stats_for_bike_site(link: str):
-    print("wow")
+class Bike:
+    def __init__(self, name, price, price_str, specs):
+        self.name = name
+        self.price = price
+        self.price_str = price_str
+        self.specs = specs
+
+    def __repr__(self):
+        from pprint import pformat
+        return pformat(vars(self))
+
+
+def get_bike_stats_for_bike_site(rel_link: str):
+    base_link = "https://www.giant-bicycles.com"
+    link = base_link + rel_link
+
+    soup = BeautifulSoup(requests.get(link).text, features="html.parser")
+    logging.debug(soup)
+
+    price_str = soup.find("div", {"class": "price"}).text
+    price = price_str
+    price = price.replace("€", "")
+    price = price.replace(".", "")
+    price = price.replace(" ", "")
+    price = int(price)
+
+    spec_table = soup.find("ul", {"class": "specifications"})
+    spec_table = spec_table.find_all("li", {"class", "datarow"})
+    specs = []
+    for i in spec_table:
+        label = i.find("div", {"class", "label"}).text
+        value = i.find("div", {"class", "value"}).text
+        specs.append({label: value})
+    return Bike(rel_link, price, price_str, specs)
 
 
 def check_multiple(link: str):
@@ -38,8 +71,14 @@ def parse_site(link: str):
     bikes_on_table = table_of_bikes.find_all("a", {"class": "textlink track-GA4-event"})
     rel_bike_sites = get_rel_bike_sites(bikes_on_table)
 
+    all_bikes = []
+
     for i in rel_bike_sites:
-        print(i)
+        all_bikes.append(get_bike_stats_for_bike_site(i))
+    all_bikes.sort(key=lambda x: x.price)
+    for i in all_bikes:
+        pprint(i)
+        print()
 
 
 def get_rel_bike_sites(bike_table) -> []:
